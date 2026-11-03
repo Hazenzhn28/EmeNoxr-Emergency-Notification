@@ -1,12 +1,37 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createTelegramService } = require("../src/services/telegram");
-const { createIncidentLog } = require("../src/services/incidents");
+
+function createTestIncidentLog() {
+  const incidents = [];
+  return {
+    async recordDetection(alertId, detectionTime) {
+      const incident = {
+        alertId,
+        detectionTime,
+        alertTime: null,
+        parentResponse: "Pending",
+        outcome: "Alert delivery in progress."
+      };
+      incidents.push(incident);
+      return incident;
+    },
+    async update(alertId, updates) {
+      const incident = incidents.find(item => item.alertId === alertId);
+      if (!incident) return null;
+      Object.assign(incident, updates);
+      return incident;
+    },
+    async list() {
+      return incidents.slice().reverse();
+    }
+  };
+}
 
 test("schedules a simulated call 60 seconds after Call 999 is confirmed", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const sentMessages = [];
-  const incidentLog = createIncidentLog();
+  const incidentLog = createTestIncidentLog();
   const bot = {
     async sendMessage(chatId, text, options) {
       sentMessages.push({ chatId, text, options });
@@ -26,7 +51,7 @@ test("schedules a simulated call 60 seconds after Call 999 is confirmed", async 
     sentMessages[0].options.reply_markup.inline_keyboard[0][0].text,
     "Call 999 (simulated)"
   );
-  const [incident] = incidentLog.list();
+  const [incident] = await incidentLog.list();
   assert.equal(incident.alertId, alertId);
   assert.ok(incident.detectionTime);
   assert.ok(incident.alertTime);
@@ -64,7 +89,7 @@ test("False Alarm cancels the 60-second no-response escalation", async t => {
       return true;
     }
   };
-  const service = createTelegramService(bot, "12345", "+60 10 914 0397", createIncidentLog());
+  const service = createTelegramService(bot, "12345", "+60 10 914 0397", createTestIncidentLog());
   const alertId = await service.sendAlert({ className: "Seizure", confidence: 1 });
 
   await service.handleAction(alertId, "false_alarm", {
@@ -91,7 +116,7 @@ test("False Alarm cancels a scheduled simulated call", async t => {
       return true;
     }
   };
-  const service = createTelegramService(bot, "12345", "+60 10 914 0397", createIncidentLog());
+  const service = createTelegramService(bot, "12345", "+60 10 914 0397", createTestIncidentLog());
   const alertId = await service.sendAlert({ className: "Seizure", confidence: 1 });
   const message = { chat: { id: "12345" }, message_id: 1 };
 
@@ -109,7 +134,7 @@ test("False Alarm cancels a scheduled simulated call", async t => {
 test("sends a simulated escalation if no button is clicked within 60 seconds", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const sentMessages = [];
-  const incidentLog = createIncidentLog();
+  const incidentLog = createTestIncidentLog();
   const bot = {
     async sendMessage(chatId, text) {
       sentMessages.push(text);
@@ -127,12 +152,12 @@ test("sends a simulated escalation if no button is clicked within 60 seconds", a
 
   assert.match(sentMessages[1], /No response was received within 60 seconds/);
   assert.match(sentMessages[1], /SIMULATED ESCALATION ONLY/);
-  assert.equal(incidentLog.list()[0].parentResponse, "Timeout");
+  assert.equal((await incidentLog.list())[0].parentResponse, "Timeout");
   assert.equal(service.alerts.get(alertId).status, "escalated");
 });
 
 test("records failed Telegram delivery as the incident outcome", async () => {
-  const incidentLog = createIncidentLog();
+  const incidentLog = createTestIncidentLog();
   const bot = {
     async sendMessage() {
       throw new Error("Telegram unavailable");
@@ -144,7 +169,7 @@ test("records failed Telegram delivery as the incident outcome", async () => {
     service.sendAlert({ className: "Test", confidence: 0.9 }),
     /Telegram unavailable/
   );
-  const [incident] = incidentLog.list();
+  const [incident] = await incidentLog.list();
   assert.equal(incident.alertTime, null);
   assert.equal(incident.outcome, "Telegram alert delivery failed.");
 });

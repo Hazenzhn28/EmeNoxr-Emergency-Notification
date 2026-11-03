@@ -20,9 +20,13 @@ A browser-based Teachable Machine image classifier that can notify a configured 
    ```
 
 2. Copy `.env.example` to `.env` and set `TELEGRAM_BOT_TOKEN`,
-   `TELEGRAM_CHAT_ID`, and `TELEGRAM_FRIEND_PHONE_NUMBER`. The friend number
-   only appears in the simulated Telegram action; the app never calls it.
-   Keep `.env` private; never commit your bot token or the phone number.
+   `TELEGRAM_CHAT_ID`, `TELEGRAM_FRIEND_PHONE_NUMBER`, and `DATABASE_URL`.
+   Get a fresh PostgreSQL connection URI from your Supabase project's database
+   settings. If the password contains URI-reserved characters (such as `@`),
+   percent-encode them in the URI. The app creates its `public.incidents` table
+   on startup. The friend number only appears in the simulated Telegram action;
+   the app never calls it. Keep `.env` private; never commit your credentials
+   or the phone number.
 
 3. Export your Teachable Machine image project using the TensorFlow.js export option.
    Put the exported model files in `public/model/`, so that `model.json`,
@@ -65,8 +69,8 @@ the app; for a group, add the bot to the intended group and use that group's ID.
   escalation notice. No call is placed.
 - The 60-second alert state is kept in server memory. Restarting the server
   loses pending timers and button state.
-- Incident history is kept in server memory and is cleared when the server
-  restarts. The Incident History panel refreshes automatically and can also be
+- Incident history is stored in the Supabase PostgreSQL `public.incidents`
+  table. The Incident History panel refreshes automatically and can also be
   refreshed manually.
 
 Run the unit tests with:

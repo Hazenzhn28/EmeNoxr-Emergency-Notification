@@ -5,7 +5,14 @@ const ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
   const alerts = new Map();
-  const incidents = new Map();
+
+  async function updateIncident(alertId, updates) {
+    try {
+      await incidentLog.update(alertId, updates);
+    } catch (error) {
+      console.error("Could not update incident history:", error.name || "UnknownError");
+    }
+  }
 
   function scheduleCleanup(alertId, record) {
     record.cleanupTimeout = setTimeout(() => alerts.delete(alertId), ALERT_RETENTION_MS);
@@ -14,8 +21,7 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
 
   async function sendAlert({ className, confidence, test }) {
     const alertId = randomUUID();
-    const incident = incidentLog.recordDetection(alertId, new Date().toISOString());
-    incidents.set(alertId, incident);
+    await incidentLog.recordDetection(alertId, new Date().toISOString());
     const prefix = test ? "[TEST] " : "";
     const text = [
       `${prefix}EmeNoxr alert`,
@@ -38,12 +44,14 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
         }
       });
     } catch (error) {
-      incident.outcome = "Telegram alert delivery failed.";
+      await updateIncident(alertId, { outcome: "Telegram alert delivery failed." });
       throw error;
     }
 
-    incident.alertTime = new Date().toISOString();
-    incident.outcome = "Alert sent; awaiting parent response.";
+    await updateIncident(alertId, {
+      alertTime: new Date().toISOString(),
+      outcome: "Alert sent; awaiting parent response."
+    });
     const record = { status: "pending", messageId: message.message_id };
     alerts.set(alertId, record);
     record.escalationTimeout = setTimeout(() => {
@@ -68,10 +76,9 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
   async function completeSimulatedCall(alertId, record) {
     if (alerts.get(alertId) !== record || record.status !== "call_scheduled") return;
     record.status = "simulated_call";
-    const incident = incidents.get(alertId);
-    if (incident) {
-      incident.outcome = `Simulated call to ${friendPhoneNumber} completed; no call was placed.`;
-    }
+    await updateIncident(alertId, {
+      outcome: `Simulated call to ${friendPhoneNumber} completed; no call was placed.`
+    });
 
     await removeButtons({ chat: { id: chatId }, message_id: record.messageId });
     try {
@@ -80,9 +87,9 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
         `SIMULATION ONLY: the 60-second delay ended. A call to ${friendPhoneNumber} would now be placed; no call was made.`
       );
     } catch (error) {
-      if (incident) {
-        incident.outcome = `Simulated call to ${friendPhoneNumber} could not be confirmed; no call was placed.`;
-      }
+      await updateIncident(alertId, {
+        outcome: `Simulated call to ${friendPhoneNumber} could not be confirmed; no call was placed.`
+      });
       console.error("Could not send simulated call completion notice:", error.name || "UnknownError");
     }
     scheduleCleanup(alertId, record);
@@ -91,11 +98,10 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
   async function escalate(alertId, record) {
     if (alerts.get(alertId) !== record || record.status !== "pending") return;
     record.status = "escalated";
-    const incident = incidents.get(alertId);
-    if (incident) {
-      incident.parentResponse = "Timeout";
-      incident.outcome = "Timed out; sending simulated escalation notice.";
-    }
+    await updateIncident(alertId, {
+      parentResponse: "Timeout",
+      outcome: "Timed out; sending simulated escalation notice."
+    });
 
     await removeButtons({ chat: { id: chatId }, message_id: record.messageId });
     try {
@@ -103,9 +109,9 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
         chatId,
         `No response was received within 60 seconds. SIMULATED ESCALATION ONLY: no call to ${friendPhoneNumber} was placed.`
       );
-      if (incident) incident.outcome = "Timed out; simulated escalation notice sent.";
+      await updateIncident(alertId, { outcome: "Timed out; simulated escalation notice sent." });
     } catch (error) {
-      if (incident) incident.outcome = "Timed out; simulated escalation notice could not be sent.";
+      await updateIncident(alertId, { outcome: "Timed out; simulated escalation notice could not be sent." });
       console.error("Could not send simulated escalation notice:", error.name || "UnknownError");
     }
     scheduleCleanup(alertId, record);
@@ -117,7 +123,6 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
       return "This alert is no longer active.";
     }
 
-    const incident = incidents.get(alertId);
     if (action === "call_999") {
       if (record.status === "call_scheduled") {
         return "A simulated call is already scheduled.";
@@ -125,10 +130,10 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
 
       clearTimeout(record.escalationTimeout);
       record.status = "call_scheduled";
-      if (incident) {
-        incident.parentResponse = "Call 999";
-        incident.outcome = `Call confirmed; simulated call to ${friendPhoneNumber} scheduled in 60 seconds.`;
-      }
+      await updateIncident(alertId, {
+        parentResponse: "Call 999",
+        outcome: `Call confirmed; simulated call to ${friendPhoneNumber} scheduled in 60 seconds.`
+      });
       record.simulatedCallTimeout = setTimeout(() => {
         void completeSimulatedCall(alertId, record);
       }, ESCALATION_DELAY_MS);
@@ -144,10 +149,10 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
     record.status = "false_alarm";
     clearTimeout(record.escalationTimeout);
     clearTimeout(record.simulatedCallTimeout);
-    if (incident) {
-      incident.parentResponse = "False Alarm";
-      incident.outcome = "Alert marked as a false alarm; no call was placed.";
-    }
+    await updateIncident(alertId, {
+      parentResponse: "False Alarm",
+      outcome: "Alert marked as a false alarm; no call was placed."
+    });
     await removeButtons(message);
     scheduleCleanup(alertId, record);
     await bot.sendMessage(chatId, "This alert was marked as a false alarm. No call was made.");
