@@ -73,6 +73,13 @@ normal Gmail password or share the App Password. The app expects either all six
 SMTP settings or none; if they are omitted, alerts continue in simulation-only
 mode and no SMS is sent.
 
+Nodemailer SMTP debug logging (`debug: true`, `logger: true`) is currently
+enabled to help troubleshoot delivery. Restart the server and check its
+terminal output after triggering a demo. These logs may contain email addresses,
+message metadata, or other sensitive details: keep them private and redact them
+before sharing. Once SMTP is working, remove these two options from
+`src/services/demoSms.js` to reduce routine logging.
+
 The app and API are served from the same origin. The bot uses Telegram long
 polling for button callbacks; do not configure a webhook for the same bot at
 the same time. Find the numeric chat ID using a trusted method before running
