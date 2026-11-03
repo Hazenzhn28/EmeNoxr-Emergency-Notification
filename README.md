@@ -1,5 +1,7 @@
 # EmeNoxr Emergency Notification
 
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/hazieq-muhaimin-070854336)
+
 A browser-based Teachable Machine image classifier that can notify a configured Telegram chat when a selected class is detected.
 
 > **Safety notice:** This project is a prototype, not a medical device or a substitute for emergency services. The “Call 999” action is a simulation and never places a phone call. If configured, it may send a clearly labeled demo SMS to the consenting recipient after 60 seconds; it does not contact emergency services.
