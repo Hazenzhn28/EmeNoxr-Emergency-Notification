@@ -1,4 +1,5 @@
 const path = require("node:path");
+const fs = require("node:fs");
 const express = require("express");
 const TelegramBot = require("node-telegram-bot-api");
 const { Pool } = require("pg");
@@ -7,6 +8,7 @@ const {
   chatId,
   friendPhoneNumber,
   databaseUrl,
+  databaseSslCaPath,
   port
 } = require("./config/env");
 const { createAlertRouter } = require("./routes/alerts");
@@ -15,9 +17,15 @@ const { createTelegramCallbackHandler } = require("./handlers/telegramCallbacks"
 const { createIncidentLog } = require("./services/incidents");
 
 const app = express();
+const databaseConnectionUrl = new URL(process.env.DATABASE_URL);
+databaseConnectionUrl.searchParams.delete("sslmode");
+const databaseSsl = { rejectUnauthorized: true };
+if (databaseSslCaPath) {
+  databaseSsl.ca = fs.readFileSync(path.resolve(databaseSslCaPath), "utf8");
+}
 const pool = new Pool({
-  connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: true }
+  connectionString: databaseConnectionUrl.toString(),
+  ssl: databaseSsl
 });
 const incidentLog = createIncidentLog(pool);
 

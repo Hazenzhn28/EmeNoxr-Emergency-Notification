@@ -64,6 +64,10 @@ setIncidentsListener(incidents => {
   }
 });
 
+document.querySelector("#refresh-incidents-button").addEventListener("click", () => {
+  void loadIncidents();
+});
+
 // Single alert path used by BOTH real camera detection and the simulate button.
 async function triggerAlert(className, confidence, test = false) {
   const result = await sendAlert(className, confidence, test);

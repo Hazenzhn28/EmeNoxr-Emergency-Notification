@@ -23,10 +23,12 @@ A browser-based Teachable Machine image classifier that can notify a configured 
    `TELEGRAM_CHAT_ID`, `TELEGRAM_FRIEND_PHONE_NUMBER`, and `DATABASE_URL`.
    Get a fresh PostgreSQL connection URI from your Supabase project's database
    settings. If the password contains URI-reserved characters (such as `@`),
-   percent-encode them in the URI. The app creates its `public.incidents` table
-   on startup. The friend number only appears in the simulated Telegram action;
-   the app never calls it. Keep `.env` private; never commit your credentials
-   or the phone number.
+   percent-encode them in the URI. If Node reports a certificate-chain error,
+   download the database CA certificate from Supabase and set
+   `DATABASE_SSL_CA` to its local file path; certificate verification remains
+   enabled. The app creates its `public.incidents` table on startup. The friend
+   number only appears in the simulated Telegram action; the app never calls
+   it. Keep `.env` private; never commit your credentials or the phone number.
 
 3. Export your Teachable Machine image project using the TensorFlow.js export option.
    Put the exported model files in `public/model/`, so that `model.json`,

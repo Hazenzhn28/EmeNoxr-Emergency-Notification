@@ -11,6 +11,7 @@ const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
 const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
 const friendPhoneNumber = process.env.TELEGRAM_FRIEND_PHONE_NUMBER?.trim();
 const databaseUrl = process.env.DATABASE_URL?.trim();
+const databaseSslCaPath = process.env.DATABASE_SSL_CA?.trim();
 
 if (!botToken) {
   throw new Error("TELEGRAM_BOT_TOKEN is required. Set it in your .env file.");
@@ -35,4 +36,11 @@ if (!["postgres:", "postgresql:"].includes(parsedDatabaseUrl.protocol)) {
   throw new Error("DATABASE_URL must use the postgres:// or postgresql:// scheme.");
 }
 
-module.exports = { botToken, chatId, friendPhoneNumber, databaseUrl, port };
+module.exports = {
+  botToken,
+  chatId,
+  friendPhoneNumber,
+  databaseUrl,
+  databaseSslCaPath,
+  port
+};
