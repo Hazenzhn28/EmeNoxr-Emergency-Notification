@@ -9,12 +9,14 @@ const {
   friendPhoneNumber,
   databaseUrl,
   databaseSslCaPath,
+  demoSmsConfig,
   port
 } = require("./config/env");
 const { createAlertRouter } = require("./routes/alerts");
 const { createTelegramService } = require("./services/telegram");
 const { createTelegramCallbackHandler } = require("./handlers/telegramCallbacks");
 const { createIncidentLog } = require("./services/incidents");
+const { createDemoSmsSender } = require("./services/demoSms");
 
 const app = express();
 const databaseConnectionUrl = new URL(process.env.DATABASE_URL);
@@ -53,7 +55,17 @@ async function startServer() {
   await incidentLog.initialize();
 
   const bot = new TelegramBot(botToken, { polling: true });
-  const telegram = createTelegramService(bot, chatId, friendPhoneNumber, incidentLog);
+  const sendDemoSms = demoSmsConfig ? createDemoSmsSender(demoSmsConfig) : null;
+  if (!sendDemoSms) {
+    console.warn("Demo SMS is not configured; the 60-second action will remain simulation-only.");
+  }
+  const telegram = createTelegramService(
+    bot,
+    chatId,
+    friendPhoneNumber,
+    incidentLog,
+    sendDemoSms
+  );
   app.use("/api/alerts", createAlertRouter(telegram.sendAlert));
   app.use("/api", (req, res) => {
     res.status(404).json({ error: "API route not found." });

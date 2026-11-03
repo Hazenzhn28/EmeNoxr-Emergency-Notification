@@ -3,7 +3,7 @@ const { randomUUID } = require("node:crypto");
 const ESCALATION_DELAY_MS = 60_000;
 const ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
+function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog, sendDemoSms = null) {
   const alerts = new Map();
 
   async function updateIncident(alertId, updates) {
@@ -29,8 +29,8 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
       `Confidence: ${(confidence * 100).toFixed(1)}%`,
       `Received: ${new Date().toISOString()}`,
       "",
-      `Test call target: ${friendPhoneNumber}`,
-      "The call action is a simulation only; no call will be placed."
+      `Demo message target: ${friendPhoneNumber}`,
+      "The 999 action never places a call. If configured, it sends a clearly labeled demo SMS after 60 seconds."
     ].join("\n");
 
     let message;
@@ -38,7 +38,7 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
       message = await bot.sendMessage(chatId, text, {
         reply_markup: {
           inline_keyboard: [[
-            { text: "Call 999 (simulated)", callback_data: `alert:${alertId}:call_999` },
+            { text: "Call 999 (demo SMS in 60s)", callback_data: `alert:${alertId}:call_999` },
             { text: "False Alarm", callback_data: `alert:${alertId}:false_alarm` }
           ]]
         }
@@ -76,21 +76,32 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
   async function completeSimulatedCall(alertId, record) {
     if (alerts.get(alertId) !== record || record.status !== "call_scheduled") return;
     record.status = "simulated_call";
-    await updateIncident(alertId, {
-      outcome: `Simulated call to ${friendPhoneNumber} completed; no call was placed.`
-    });
-
     await removeButtons({ chat: { id: chatId }, message_id: record.messageId });
+    let deliveryNotice;
+    try {
+      if (!sendDemoSms) {
+        throw new Error("Demo SMS is not configured.");
+      }
+      await sendDemoSms();
+      await updateIncident(alertId, {
+        outcome: "DEMO SMS sent through the configured email-to-SMS gateway; no call was placed."
+      });
+      deliveryNotice = "The clearly labeled DEMO SMS was sent; no call was placed.";
+    } catch (error) {
+      await updateIncident(alertId, {
+        outcome: "DEMO SMS was not sent; no call was placed."
+      });
+      console.error("Could not send demo SMS:", error.name || "UnknownError");
+      deliveryNotice = "The DEMO SMS could not be sent; no call was placed.";
+    }
+
     try {
       await bot.sendMessage(
         chatId,
-        `SIMULATION ONLY: the 60-second delay ended. A call to ${friendPhoneNumber} would now be placed; no call was made.`
+        `SIMULATION ONLY: the 60-second delay ended. ${deliveryNotice}`
       );
     } catch (error) {
-      await updateIncident(alertId, {
-        outcome: `Simulated call to ${friendPhoneNumber} could not be confirmed; no call was placed.`
-      });
-      console.error("Could not send simulated call completion notice:", error.name || "UnknownError");
+      console.error("Could not send demo escalation confirmation:", error.name || "UnknownError");
     }
     scheduleCleanup(alertId, record);
   }
@@ -141,9 +152,9 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
 
       await bot.sendMessage(
         chatId,
-        `Call 999 request confirmed. SIMULATION ONLY: a call to ${friendPhoneNumber} is scheduled in 60 seconds. Press False Alarm to cancel; no real call will be placed.`
+        `Call 999 request confirmed. DEMO ONLY: a clearly labeled test SMS to ${friendPhoneNumber} is scheduled in 60 seconds if configured. Press False Alarm to cancel; no call will be placed.`
       );
-      return "Call 999 confirmed; simulated call scheduled in 60 seconds.";
+      return "Call 999 confirmed; demo SMS scheduled in 60 seconds.";
     }
 
     record.status = "false_alarm";

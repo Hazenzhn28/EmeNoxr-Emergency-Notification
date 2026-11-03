@@ -2,7 +2,7 @@
 
 A browser-based Teachable Machine image classifier that can notify a configured Telegram chat when a selected class is detected.
 
-> **Safety notice:** This project is a prototype, not a medical device or a substitute for emergency services. The “Call 999” button and the 60-second escalation are simulations only. This application never places a phone call or contacts emergency services.
+> **Safety notice:** This project is a prototype, not a medical device or a substitute for emergency services. The “Call 999” action is a simulation and never places a phone call. If configured, it may send a clearly labeled demo SMS to the consenting recipient after 60 seconds; it does not contact emergency services.
 
 ## Requirements
 
@@ -26,9 +26,8 @@ A browser-based Teachable Machine image classifier that can notify a configured 
    percent-encode them in the URI. If Node reports a certificate-chain error,
    download the database CA certificate from Supabase and set
    `DATABASE_SSL_CA` to its local file path; certificate verification remains
-   enabled. The app creates its `public.incidents` table on startup. The friend
-   number only appears in the simulated Telegram action; the app never calls
-   it. Keep `.env` private; never commit your credentials or the phone number.
+   enabled. The app creates its `public.incidents` table on startup. Keep
+   `.env` private; never commit your credentials or contact details.
 
 3. Export your Teachable Machine image project using the TensorFlow.js export option.
    Put the exported model files in `public/model/`, so that `model.json`,
@@ -47,6 +46,32 @@ A browser-based Teachable Machine image classifier that can notify a configured 
    If the Teachable Machine model is unavailable, the page offers **Simulate
    Seizure Detection**, which sends the same Seizure alert through the backend
    without using the camera. The call action remains simulated.
+   To enable the optional demo SMS, configure the SMTP variables below.
+
+### Optional demo SMS
+
+The **Call 999 (demo SMS in 60s)** button can send a clearly labeled test
+message through an email-to-SMS gateway after 60 seconds. It never places a
+phone call or sends a real emergency alert. Only configure this for a recipient
+who has agreed to receive the demo, and confirm their carrier supports its
+email-to-SMS gateway; gateway domains and availability vary by carrier.
+
+For Gmail SMTP, enable 2-Step Verification and create a Google App Password.
+Add these lines to the private `.env` file:
+
+```dotenv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=your-gmail-address@gmail.com
+SMTP_PASS=your-16-character-google-app-password
+SMTP_FROM=your-gmail-address@gmail.com
+DEMO_SMS_TO=recipient-address-confirmed-by-their-carrier
+```
+
+Use the same Gmail address for `SMTP_USER` and `SMTP_FROM`. Do not use your
+normal Gmail password or share the App Password. The app expects either all six
+SMTP settings or none; if they are omitted, alerts continue in simulation-only
+mode and no SMS is sent.
 
 The app and API are served from the same origin. The bot uses Telegram long
 polling for button callbacks; do not configure a webhook for the same bot at

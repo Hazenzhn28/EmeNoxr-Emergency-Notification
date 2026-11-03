@@ -28,9 +28,10 @@ function createTestIncidentLog() {
   };
 }
 
-test("schedules a simulated call 60 seconds after Call 999 is confirmed", async t => {
+test("sends a clearly labeled demo SMS after the Call 999 60-second delay", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const sentMessages = [];
+  const demoSmsCalls = [];
   const incidentLog = createTestIncidentLog();
   const bot = {
     async sendMessage(chatId, text, options) {
@@ -41,15 +42,21 @@ test("schedules a simulated call 60 seconds after Call 999 is confirmed", async 
       return true;
     }
   };
-  const service = createTelegramService(bot, "12345", "+60 10 914 0397", incidentLog);
+  const service = createTelegramService(
+    bot,
+    "12345",
+    "+60 10 914 0397",
+    incidentLog,
+    async () => demoSmsCalls.push("sent")
+  );
 
   const alertId = await service.sendAlert({ className: "Test", confidence: 0.9, test: true });
 
-  assert.match(sentMessages[0].text, /Test call target: \+60 10 914 0397/);
-  assert.match(sentMessages[0].text, /no call will be placed/i);
+  assert.match(sentMessages[0].text, /Demo message target: \+60 10 914 0397/);
+  assert.match(sentMessages[0].text, /never places a call/i);
   assert.equal(
     sentMessages[0].options.reply_markup.inline_keyboard[0][0].text,
-    "Call 999 (simulated)"
+    "Call 999 (demo SMS in 60s)"
   );
   const [incident] = await incidentLog.list();
   assert.equal(incident.alertId, alertId);
@@ -72,9 +79,10 @@ test("schedules a simulated call 60 seconds after Call 999 is confirmed", async 
   t.mock.timers.tick(1);
   await new Promise(resolve => setImmediate(resolve));
   assert.match(sentMessages[2].text, /SIMULATION ONLY/i);
-  assert.match(sentMessages[2].text, /no call was made/i);
+  assert.match(sentMessages[2].text, /clearly labeled DEMO SMS was sent/i);
+  assert.equal(demoSmsCalls.length, 1);
   assert.equal(service.alerts.get(alertId).status, "simulated_call");
-  assert.match(incident.outcome, /no call was placed/i);
+  assert.match(incident.outcome, /DEMO SMS sent/i);
 });
 
 test("False Alarm cancels the 60-second no-response escalation", async t => {
@@ -107,6 +115,7 @@ test("False Alarm cancels the 60-second no-response escalation", async t => {
 test("False Alarm cancels a scheduled simulated call", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const sentMessages = [];
+  let demoSmsSent = false;
   const bot = {
     async sendMessage(chatId, text) {
       sentMessages.push(text);
@@ -116,7 +125,15 @@ test("False Alarm cancels a scheduled simulated call", async t => {
       return true;
     }
   };
-  const service = createTelegramService(bot, "12345", "+60 10 914 0397", createTestIncidentLog());
+  const service = createTelegramService(
+    bot,
+    "12345",
+    "+60 10 914 0397",
+    createTestIncidentLog(),
+    async () => {
+      demoSmsSent = true;
+    }
+  );
   const alertId = await service.sendAlert({ className: "Seizure", confidence: 1 });
   const message = { chat: { id: "12345" }, message_id: 1 };
 
@@ -129,6 +146,7 @@ test("False Alarm cancels a scheduled simulated call", async t => {
   assert.equal(service.alerts.get(alertId).status, "false_alarm");
   assert.equal(sentMessages.length, 3);
   assert.doesNotMatch(sentMessages.join("\n"), /SIMULATION ONLY: the 60-second delay ended/);
+  assert.equal(demoSmsSent, false);
 });
 
 test("sends a simulated escalation if no button is clicked within 60 seconds", async t => {
