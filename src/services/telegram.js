@@ -65,6 +65,29 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
     }
   }
 
+  async function completeSimulatedCall(alertId, record) {
+    if (alerts.get(alertId) !== record || record.status !== "call_scheduled") return;
+    record.status = "simulated_call";
+    const incident = incidents.get(alertId);
+    if (incident) {
+      incident.outcome = `Simulated call to ${friendPhoneNumber} completed; no call was placed.`;
+    }
+
+    await removeButtons({ chat: { id: chatId }, message_id: record.messageId });
+    try {
+      await bot.sendMessage(
+        chatId,
+        `SIMULATION ONLY: the 60-second delay ended. A call to ${friendPhoneNumber} would now be placed; no call was made.`
+      );
+    } catch (error) {
+      if (incident) {
+        incident.outcome = `Simulated call to ${friendPhoneNumber} could not be confirmed; no call was placed.`;
+      }
+      console.error("Could not send simulated call completion notice:", error.name || "UnknownError");
+    }
+    scheduleCleanup(alertId, record);
+  }
+
   async function escalate(alertId, record) {
     if (alerts.get(alertId) !== record || record.status !== "pending") return;
     record.status = "escalated";
@@ -90,29 +113,45 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
 
   async function handleAction(alertId, action, message) {
     const record = alerts.get(alertId);
-    if (!record || record.status !== "pending") {
+    if (!record || !["pending", "call_scheduled"].includes(record.status)) {
       return "This alert is no longer active.";
     }
 
-    record.status = action === "call_999" ? "simulated_call" : "false_alarm";
     const incident = incidents.get(alertId);
-    if (incident) {
-      incident.parentResponse = action === "call_999" ? "Call 999" : "False Alarm";
-      incident.outcome = action === "call_999"
-        ? `Simulated call to ${friendPhoneNumber}; no call was placed.`
-        : "Alert marked as a false alarm; no call was placed.";
+    if (action === "call_999") {
+      if (record.status === "call_scheduled") {
+        return "A simulated call is already scheduled.";
+      }
+
+      clearTimeout(record.escalationTimeout);
+      record.status = "call_scheduled";
+      if (incident) {
+        incident.parentResponse = "Call 999";
+        incident.outcome = `Call confirmed; simulated call to ${friendPhoneNumber} scheduled in 60 seconds.`;
+      }
+      record.simulatedCallTimeout = setTimeout(() => {
+        void completeSimulatedCall(alertId, record);
+      }, ESCALATION_DELAY_MS);
+      record.simulatedCallTimeout.unref?.();
+
+      await bot.sendMessage(
+        chatId,
+        `Call 999 request confirmed. SIMULATION ONLY: a call to ${friendPhoneNumber} is scheduled in 60 seconds. Press False Alarm to cancel; no real call will be placed.`
+      );
+      return "Call 999 confirmed; simulated call scheduled in 60 seconds.";
     }
+
+    record.status = "false_alarm";
     clearTimeout(record.escalationTimeout);
+    clearTimeout(record.simulatedCallTimeout);
+    if (incident) {
+      incident.parentResponse = "False Alarm";
+      incident.outcome = "Alert marked as a false alarm; no call was placed.";
+    }
     await removeButtons(message);
     scheduleCleanup(alertId, record);
-
-    const response = action === "call_999"
-      ? `SIMULATION ONLY: test call to ${friendPhoneNumber}. No call was made.`
-      : "This alert was marked as a false alarm. No call was made.";
-    await bot.sendMessage(chatId, response);
-    return action === "call_999"
-      ? `999 call simulated; no call to ${friendPhoneNumber} was made.`
-      : "Marked as false alarm.";
+    await bot.sendMessage(chatId, "This alert was marked as a false alarm. No call was made.");
+    return "Marked as false alarm; pending timer cancelled.";
   }
 
   return { sendAlert, handleAction, alerts };

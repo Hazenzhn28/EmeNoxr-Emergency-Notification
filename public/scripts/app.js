@@ -9,6 +9,8 @@ const predictionLabel = document.querySelector("#prediction");
 const startButton = document.querySelector("#start-button");
 const stopButton = document.querySelector("#stop-button");
 const testButton = document.querySelector("#test-alert-button");
+const simulateDetectionButton = document.querySelector("#simulate-detection-button");
+const modelError = document.querySelector("#model-error");
 const classInput = document.querySelector("#alert-class");
 const thresholdInput = document.querySelector("#confidence-threshold");
 const thresholdValue = document.querySelector("#threshold-value");
@@ -51,6 +53,17 @@ function startEscalationCountdown(alertId) {
 
   updateCountdown();
   countdownInterval = window.setInterval(updateCountdown, 250);
+}
+
+async function triggerAlert(className, confidence, test = false) {
+  const result = await sendAlert(className, confidence, test);
+  status.textContent = test
+    ? "Test alert sent. Check the configured Telegram chat."
+    : "Alert sent. Check the configured Telegram chat.";
+  if (!test && className.trim().toLowerCase() === "seizure") {
+    startEscalationCountdown(result.alertId);
+  }
+  void loadIncidents();
 }
 
 function formatIncidentTime(value) {
@@ -129,12 +142,7 @@ async function runDetection() {
         detectionLatched = true;
         status.textContent = "Matching class detected. Sending Telegram alert…";
         try {
-          const result = await sendAlert(prediction.className, confidence);
-          status.textContent = "Alert sent. Check the configured Telegram chat.";
-          if (prediction.className.trim().toLowerCase() === "seizure") {
-            startEscalationCountdown(result.alertId);
-          }
-          void loadIncidents();
+          await triggerAlert(prediction.className, confidence);
         } catch (error) {
           detectionLatched = false;
           status.textContent = error.message;
@@ -169,6 +177,8 @@ startButton.addEventListener("click", async () => {
   status.textContent = "Loading model and camera…";
   try {
     model ??= await loadModel();
+    modelError.hidden = true;
+    simulateDetectionButton.hidden = true;
     stream = await startCamera(video);
     placeholder.hidden = true;
     running = true;
@@ -182,12 +192,32 @@ startButton.addEventListener("click", async () => {
       stream = undefined;
     }
     startButton.disabled = false;
-    status.textContent = error.message;
+    if (!model) {
+      modelError.textContent =
+        "We couldn't load the Teachable Machine model. Check that its files are in public/model/. You can still test the alert flow with simulated detection.";
+      modelError.hidden = false;
+      simulateDetectionButton.hidden = false;
+      status.textContent = "Camera detection is unavailable; simulated detection is ready.";
+    } else {
+      status.textContent = error.message;
+    }
   }
 });
 
 stopButton.addEventListener("click", () => {
   void stopDetection();
+});
+
+simulateDetectionButton.addEventListener("click", async () => {
+  simulateDetectionButton.disabled = true;
+  status.textContent = "Sending simulated Seizure alert…";
+  try {
+    await triggerAlert("Seizure", 1);
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    simulateDetectionButton.disabled = false;
+  }
 });
 
 testButton.addEventListener("click", async () => {
@@ -198,9 +228,7 @@ testButton.addEventListener("click", async () => {
   testButton.disabled = true;
   status.textContent = "Sending test message…";
   try {
-    await sendAlert(classInput.value.trim() || "Test", 1, true);
-    status.textContent = "Test alert sent. Check the configured Telegram chat.";
-    void loadIncidents();
+    await triggerAlert(classInput.value.trim() || "Test", 1, true);
   } catch (error) {
     status.textContent = error.message;
   } finally {

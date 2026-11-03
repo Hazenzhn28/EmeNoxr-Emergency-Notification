@@ -38,6 +38,9 @@ A browser-based Teachable Machine image classifier that can notify a configured 
 5. Open <http://localhost:3000>. Allow camera access, enter the exact class name
    you want to alert on, and start detection. Use **Send test Telegram alert**
    to check the bot integration; it sends a clearly marked test message.
+   If the Teachable Machine model is unavailable, the page offers **Simulate
+   Seizure Detection**, which sends the same Seizure alert through the backend
+   without using the camera. The call action remains simulated.
 
 The app and API are served from the same origin. The bot uses Telegram long
 polling for button callbacks; do not configure a webhook for the same bot at
@@ -50,9 +53,11 @@ the app; for a group, add the bot to the intended group and use that group's ID.
   Telegram alert. The detector must stop matching before it can trigger again.
 - The Telegram message includes **Call 999 (simulated)** and **False Alarm**
   buttons, and shows the configured friend number as the test call target.
-- Selecting **Call 999 (simulated)** sends a confirmation; it does not place a
-  phone call to the friend or to emergency services.
-- Selecting **False Alarm** marks the alert as dismissed.
+- Selecting **Call 999 (simulated)** sends a confirmation and schedules a
+  simulated call notice 60 seconds later. **False Alarm** remains available
+  during that delay and cancels it. No phone call is ever placed.
+- Selecting **False Alarm** before responding also cancels the no-response
+  timer and marks the alert as dismissed.
 - A Seizure alert shows a visible 60-second countdown in the web app. If it
   reaches zero, the app displays “Simulated 999 Escalation Triggered”; this
   does not place a call. A Telegram response stops the countdown.

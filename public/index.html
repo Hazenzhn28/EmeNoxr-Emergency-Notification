@@ -26,6 +26,7 @@
 
       <section class="panel" aria-labelledby="camera-heading">
         <h2 id="camera-heading">Live detection</h2>
+        <p>Simulated detection sends a Seizure alert through Telegram without using the camera. No call is placed.</p>
         <div class="camera-frame">
           <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
           <p id="camera-placeholder">Camera preview will appear here.</p>
@@ -45,7 +46,9 @@
         <div class="actions">
           <button id="start-button" type="button">Start detection</button>
           <button id="stop-button" class="secondary" type="button" disabled>Stop</button>
+          <button id="simulate-detection-button" class="secondary" type="button" hidden>Simulate Seizure Detection</button>
         </div>
+        <p id="model-error" class="status" role="alert" hidden></p>
         <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
         <p id="prediction" class="prediction">Waiting for a prediction.</p>
         <p id="escalation-countdown" class="status countdown" role="timer" aria-live="off" hidden></p>
