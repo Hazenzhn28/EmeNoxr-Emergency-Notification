@@ -1,6 +1,7 @@
 import { startCamera, stopCamera } from "./camera.js";
 import { classify, loadModel } from "./classifier.js";
 import { sendAlert } from "./alerts.js";
+import { loadIncidents, setIncidentsListener } from "./incidents.js";
 
 const video = document.querySelector("#camera");
 const placeholder = document.querySelector("#camera-placeholder");
@@ -14,9 +15,6 @@ const modelError = document.querySelector("#model-error");
 const classInput = document.querySelector("#alert-class");
 const thresholdInput = document.querySelector("#confidence-threshold");
 const thresholdValue = document.querySelector("#threshold-value");
-const incidentList = document.querySelector("#incident-list");
-const incidentStatus = document.querySelector("#incident-status");
-const refreshIncidentsButton = document.querySelector("#refresh-incidents-button");
 const escalationCountdown = document.querySelector("#escalation-countdown");
 
 let model;
@@ -55,6 +53,18 @@ function startEscalationCountdown(alertId) {
   countdownInterval = window.setInterval(updateCountdown, 250);
 }
 
+// Stop the simulated countdown once the parent has responded.
+setIncidentsListener(incidents => {
+  if (!activeCountdownAlertId) return;
+  const activeIncident = incidents.find(incident => incident.alertId === activeCountdownAlertId);
+  if (activeIncident && activeIncident.parentResponse !== "Pending") {
+    stopCountdown(activeIncident.parentResponse === "Timeout"
+      ? "Simulated 999 Escalation Triggered"
+      : `Simulated countdown stopped: ${activeIncident.parentResponse} response received.`);
+  }
+});
+
+// Single alert path used by BOTH real camera detection and the simulate button.
 async function triggerAlert(className, confidence, test = false) {
   const result = await sendAlert(className, confidence, test);
   status.textContent = test
@@ -63,65 +73,11 @@ async function triggerAlert(className, confidence, test = false) {
   if (!test && className.trim().toLowerCase() === "seizure") {
     startEscalationCountdown(result.alertId);
   }
-  void loadIncidents();
-}
-
-function formatIncidentTime(value) {
-  if (!value) return "Not sent";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium"
-  }).format(new Date(value));
-}
-
-async function loadIncidents() {
-  try {
-    const response = await fetch("/api/incidents");
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || "Incident history could not be loaded.");
-    }
-
-    incidentList.replaceChildren();
-    for (const incident of result.incidents) {
-      const row = document.createElement("tr");
-      for (const value of [
-        formatIncidentTime(incident.detectionTime),
-        formatIncidentTime(incident.alertTime),
-        incident.parentResponse,
-        incident.outcome
-      ]) {
-        const cell = document.createElement("td");
-        cell.textContent = value;
-        row.append(cell);
-      }
-      incidentList.append(row);
-    }
-    incidentStatus.textContent = result.incidents.length
-      ? `${result.incidents.length} incident(s) recorded.`
-      : "No incidents recorded yet.";
-
-    if (activeCountdownAlertId) {
-      const activeIncident = result.incidents.find(
-        incident => incident.alertId === activeCountdownAlertId
-      );
-      if (activeIncident && activeIncident.parentResponse !== "Pending") {
-        stopCountdown(activeIncident.parentResponse === "Timeout"
-          ? "Simulated 999 Escalation Triggered"
-          : `Simulated countdown stopped: ${activeIncident.parentResponse} response received.`);
-      }
-    }
-  } catch (error) {
-    incidentStatus.textContent = error.message;
-  }
+  void loadIncidents({ silent: true });
 }
 
 thresholdInput.addEventListener("input", () => {
   thresholdValue.value = `${thresholdInput.value}%`;
-});
-
-refreshIncidentsButton.addEventListener("click", () => {
-  void loadIncidents();
 });
 
 async function runDetection() {
@@ -212,7 +168,7 @@ simulateDetectionButton.addEventListener("click", async () => {
   simulateDetectionButton.disabled = true;
   status.textContent = "Sending simulated Seizure alert…";
   try {
-    await triggerAlert("Seizure", 1);
+    await triggerAlert("Seizure", 1); // same path as real detection
   } catch (error) {
     status.textContent = error.message;
   } finally {
@@ -238,7 +194,7 @@ testButton.addEventListener("click", async () => {
 
 void loadIncidents();
 window.setInterval(() => {
-  void loadIncidents();
+  void loadIncidents({ silent: true });
 }, 5000);
 
 window.addEventListener("pagehide", () => {

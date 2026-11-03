@@ -14,10 +14,29 @@ const telegram = createTelegramService(bot, chatId, friendPhoneNumber, incidentL
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
+
+// API responses must never be cached or served as HTML.
+app.use("/api", (req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "..", "public")));
 app.use("/api/alerts", createAlertRouter(telegram.sendAlert));
+
 app.get("/api/incidents", (req, res) => {
-  res.json({ incidents: incidentLog.list() });
+  try {
+    const incidents = incidentLog.list();
+    res.json({ incidents: Array.isArray(incidents) ? incidents : [] });
+  } catch (error) {
+    console.error("Incident list failed:", error.name || "UnknownError");
+    res.status(500).json({ error: "Incident history could not be loaded." });
+  }
+});
+
+// Any unknown /api route returns JSON, not Express's default HTML 404 page.
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API route not found." });
 });
 
 app.use((error, req, res, next) => {
