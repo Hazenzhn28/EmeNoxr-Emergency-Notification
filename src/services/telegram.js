@@ -3,7 +3,7 @@ const { randomUUID } = require("node:crypto");
 const ESCALATION_DELAY_MS = 60_000;
 const ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-function createTelegramService(bot, chatId) {
+function createTelegramService(bot, chatId, friendPhoneNumber) {
   const alerts = new Map();
 
   function scheduleCleanup(alertId, record) {
@@ -20,7 +20,8 @@ function createTelegramService(bot, chatId) {
       `Confidence: ${(confidence * 100).toFixed(1)}%`,
       `Received: ${new Date().toISOString()}`,
       "",
-      "Choose an action below. The 999 action is a simulation only."
+      `Test call target: ${friendPhoneNumber}`,
+      "The call action is a simulation only; no call will be placed."
     ].join("\n");
 
     const message = await bot.sendMessage(chatId, text, {
@@ -61,7 +62,7 @@ function createTelegramService(bot, chatId) {
     try {
       await bot.sendMessage(
         chatId,
-        "No response was received within 60 seconds. SIMULATED ESCALATION ONLY: no 999 call was placed and no emergency services were contacted."
+        `No response was received within 60 seconds. SIMULATED ESCALATION ONLY: no call to ${friendPhoneNumber} was placed.`
       );
     } catch (error) {
       console.error("Could not send simulated escalation notice:", error.name || "UnknownError");
@@ -81,10 +82,12 @@ function createTelegramService(bot, chatId) {
     scheduleCleanup(alertId, record);
 
     const response = action === "call_999"
-      ? "SIMULATION ONLY: a 999 call would be placed. No call was made."
+      ? `SIMULATION ONLY: test call to ${friendPhoneNumber}. No call was made.`
       : "This alert was marked as a false alarm. No call was made.";
     await bot.sendMessage(chatId, response);
-    return action === "call_999" ? "999 call simulated; no call was made." : "Marked as false alarm.";
+    return action === "call_999"
+      ? `999 call simulated; no call to ${friendPhoneNumber} was made.`
+      : "Marked as false alarm.";
   }
 
   return { sendAlert, handleAction, alerts };

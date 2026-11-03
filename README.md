@@ -19,8 +19,10 @@ A browser-based Teachable Machine image classifier that can notify a configured 
    npm install
    ```
 
-2. Copy `.env.example` to `.env` and set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
-   Keep `.env` private; never commit your bot token.
+2. Copy `.env.example` to `.env` and set `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_CHAT_ID`, and `TELEGRAM_FRIEND_PHONE_NUMBER`. The friend number
+   only appears in the simulated Telegram action; the app never calls it.
+   Keep `.env` private; never commit your bot token or the phone number.
 
 3. Export your Teachable Machine image project using the TensorFlow.js export option.
    Put the exported model files in `public/model/`, so that `model.json`,
@@ -46,12 +48,13 @@ the app; for a group, add the bot to the intended group and use that group's ID.
 
 - A matching class at or above the selected confidence threshold sends one
   Telegram alert. The detector must stop matching before it can trigger again.
-- The Telegram message includes **Call 999** and **False Alarm** buttons.
-- Selecting **Call 999** sends a confirmation that a call was simulated; it does
-  not dial 999.
+- The Telegram message includes **Call 999 (simulated)** and **False Alarm**
+  buttons, and shows the configured friend number as the test call target.
+- Selecting **Call 999 (simulated)** sends a confirmation; it does not place a
+  phone call to the friend or to emergency services.
 - Selecting **False Alarm** marks the alert as dismissed.
 - If neither button is selected within 60 seconds, the bot sends a simulated
-  escalation notice. No call is placed and no emergency service is contacted.
+  escalation notice. No call is placed.
 - The 60-second alert state is kept in server memory. Restarting the server
   loses pending timers and button state.
 
