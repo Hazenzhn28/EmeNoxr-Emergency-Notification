@@ -48,12 +48,34 @@
         </div>
         <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
         <p id="prediction" class="prediction">Waiting for a prediction.</p>
+        <p id="escalation-countdown" class="status countdown" role="timer" aria-live="off" hidden></p>
       </section>
 
       <section class="panel" aria-labelledby="test-heading">
         <h2 id="test-heading">Telegram integration</h2>
         <p>Send a clearly marked test message to the configured Telegram chat.</p>
         <button id="test-alert-button" class="secondary" type="button">Send test Telegram alert</button>
+      </section>
+
+      <section class="panel" aria-labelledby="incident-heading">
+        <div class="section-heading">
+          <h2 id="incident-heading">Incident history</h2>
+          <button id="refresh-incidents-button" class="secondary" type="button">Refresh</button>
+        </div>
+        <p id="incident-status" class="status" role="status" aria-live="polite">Loading incident history…</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Detection time</th>
+                <th scope="col">Alert time</th>
+                <th scope="col">Parent response</th>
+                <th scope="col">Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="incident-list"></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </body>

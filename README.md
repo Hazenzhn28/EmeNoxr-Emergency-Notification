@@ -53,10 +53,16 @@ the app; for a group, add the bot to the intended group and use that group's ID.
 - Selecting **Call 999 (simulated)** sends a confirmation; it does not place a
   phone call to the friend or to emergency services.
 - Selecting **False Alarm** marks the alert as dismissed.
+- A Seizure alert shows a visible 60-second countdown in the web app. If it
+  reaches zero, the app displays “Simulated 999 Escalation Triggered”; this
+  does not place a call. A Telegram response stops the countdown.
 - If neither button is selected within 60 seconds, the bot sends a simulated
   escalation notice. No call is placed.
 - The 60-second alert state is kept in server memory. Restarting the server
   loses pending timers and button state.
+- Incident history is kept in server memory and is cleared when the server
+  restarts. The Incident History panel refreshes automatically and can also be
+  refreshed manually.
 
 Run the unit tests with:
 

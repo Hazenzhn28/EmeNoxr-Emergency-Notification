@@ -3,8 +3,9 @@ const { randomUUID } = require("node:crypto");
 const ESCALATION_DELAY_MS = 60_000;
 const ALERT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-function createTelegramService(bot, chatId, friendPhoneNumber) {
+function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog) {
   const alerts = new Map();
+  const incidents = new Map();
 
   function scheduleCleanup(alertId, record) {
     record.cleanupTimeout = setTimeout(() => alerts.delete(alertId), ALERT_RETENTION_MS);
@@ -13,6 +14,8 @@ function createTelegramService(bot, chatId, friendPhoneNumber) {
 
   async function sendAlert({ className, confidence, test }) {
     const alertId = randomUUID();
+    const incident = incidentLog.recordDetection(alertId, new Date().toISOString());
+    incidents.set(alertId, incident);
     const prefix = test ? "[TEST] " : "";
     const text = [
       `${prefix}EmeNoxr alert`,
@@ -24,15 +27,23 @@ function createTelegramService(bot, chatId, friendPhoneNumber) {
       "The call action is a simulation only; no call will be placed."
     ].join("\n");
 
-    const message = await bot.sendMessage(chatId, text, {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: "Call 999 (simulated)", callback_data: `alert:${alertId}:call_999` },
-          { text: "False Alarm", callback_data: `alert:${alertId}:false_alarm` }
-        ]]
-      }
-    });
+    let message;
+    try {
+      message = await bot.sendMessage(chatId, text, {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: "Call 999 (simulated)", callback_data: `alert:${alertId}:call_999` },
+            { text: "False Alarm", callback_data: `alert:${alertId}:false_alarm` }
+          ]]
+        }
+      });
+    } catch (error) {
+      incident.outcome = "Telegram alert delivery failed.";
+      throw error;
+    }
 
+    incident.alertTime = new Date().toISOString();
+    incident.outcome = "Alert sent; awaiting parent response.";
     const record = { status: "pending", messageId: message.message_id };
     alerts.set(alertId, record);
     record.escalationTimeout = setTimeout(() => {
@@ -57,6 +68,11 @@ function createTelegramService(bot, chatId, friendPhoneNumber) {
   async function escalate(alertId, record) {
     if (alerts.get(alertId) !== record || record.status !== "pending") return;
     record.status = "escalated";
+    const incident = incidents.get(alertId);
+    if (incident) {
+      incident.parentResponse = "Timeout";
+      incident.outcome = "Timed out; sending simulated escalation notice.";
+    }
 
     await removeButtons({ chat: { id: chatId }, message_id: record.messageId });
     try {
@@ -64,7 +80,9 @@ function createTelegramService(bot, chatId, friendPhoneNumber) {
         chatId,
         `No response was received within 60 seconds. SIMULATED ESCALATION ONLY: no call to ${friendPhoneNumber} was placed.`
       );
+      if (incident) incident.outcome = "Timed out; simulated escalation notice sent.";
     } catch (error) {
+      if (incident) incident.outcome = "Timed out; simulated escalation notice could not be sent.";
       console.error("Could not send simulated escalation notice:", error.name || "UnknownError");
     }
     scheduleCleanup(alertId, record);
@@ -77,6 +95,13 @@ function createTelegramService(bot, chatId, friendPhoneNumber) {
     }
 
     record.status = action === "call_999" ? "simulated_call" : "false_alarm";
+    const incident = incidents.get(alertId);
+    if (incident) {
+      incident.parentResponse = action === "call_999" ? "Call 999" : "False Alarm";
+      incident.outcome = action === "call_999"
+        ? `Simulated call to ${friendPhoneNumber}; no call was placed.`
+        : "Alert marked as a false alarm; no call was placed.";
+    }
     clearTimeout(record.escalationTimeout);
     await removeButtons(message);
     scheduleCleanup(alertId, record);

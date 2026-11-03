@@ -5,15 +5,20 @@ const { botToken, chatId, friendPhoneNumber, port } = require("./config/env");
 const { createAlertRouter } = require("./routes/alerts");
 const { createTelegramService } = require("./services/telegram");
 const { createTelegramCallbackHandler } = require("./handlers/telegramCallbacks");
+const { createIncidentLog } = require("./services/incidents");
 
 const app = express();
 const bot = new TelegramBot(botToken, { polling: true });
-const telegram = createTelegramService(bot, chatId, friendPhoneNumber);
+const incidentLog = createIncidentLog();
+const telegram = createTelegramService(bot, chatId, friendPhoneNumber, incidentLog);
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 app.use("/api/alerts", createAlertRouter(telegram.sendAlert));
+app.get("/api/incidents", (req, res) => {
+  res.json({ incidents: incidentLog.list() });
+});
 
 app.use((error, req, res, next) => {
   if (error instanceof SyntaxError && "body" in error) {

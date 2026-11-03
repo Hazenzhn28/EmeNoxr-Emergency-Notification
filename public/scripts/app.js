@@ -12,14 +12,103 @@ const testButton = document.querySelector("#test-alert-button");
 const classInput = document.querySelector("#alert-class");
 const thresholdInput = document.querySelector("#confidence-threshold");
 const thresholdValue = document.querySelector("#threshold-value");
+const incidentList = document.querySelector("#incident-list");
+const incidentStatus = document.querySelector("#incident-status");
+const refreshIncidentsButton = document.querySelector("#refresh-incidents-button");
+const escalationCountdown = document.querySelector("#escalation-countdown");
 
 let model;
 let running = false;
 let detectionLatched = false;
 let stream;
+let countdownInterval;
+let activeCountdownAlertId;
+
+function stopCountdown(message) {
+  window.clearInterval(countdownInterval);
+  countdownInterval = undefined;
+  activeCountdownAlertId = undefined;
+  escalationCountdown.textContent = message;
+  escalationCountdown.setAttribute("aria-live", "polite");
+}
+
+function startEscalationCountdown(alertId) {
+  window.clearInterval(countdownInterval);
+  activeCountdownAlertId = alertId;
+  escalationCountdown.hidden = false;
+  escalationCountdown.setAttribute("aria-live", "off");
+  const deadline = Date.now() + 60_000;
+
+  function updateCountdown() {
+    const secondsRemaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    if (secondsRemaining === 0) {
+      stopCountdown("Simulated 999 Escalation Triggered");
+      return;
+    }
+    escalationCountdown.textContent =
+      `Simulated 999 escalation in ${secondsRemaining} second${secondsRemaining === 1 ? "" : "s"}.`;
+  }
+
+  updateCountdown();
+  countdownInterval = window.setInterval(updateCountdown, 250);
+}
+
+function formatIncidentTime(value) {
+  if (!value) return "Not sent";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium"
+  }).format(new Date(value));
+}
+
+async function loadIncidents() {
+  try {
+    const response = await fetch("/api/incidents");
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Incident history could not be loaded.");
+    }
+
+    incidentList.replaceChildren();
+    for (const incident of result.incidents) {
+      const row = document.createElement("tr");
+      for (const value of [
+        formatIncidentTime(incident.detectionTime),
+        formatIncidentTime(incident.alertTime),
+        incident.parentResponse,
+        incident.outcome
+      ]) {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.append(cell);
+      }
+      incidentList.append(row);
+    }
+    incidentStatus.textContent = result.incidents.length
+      ? `${result.incidents.length} incident(s) recorded.`
+      : "No incidents recorded yet.";
+
+    if (activeCountdownAlertId) {
+      const activeIncident = result.incidents.find(
+        incident => incident.alertId === activeCountdownAlertId
+      );
+      if (activeIncident && activeIncident.parentResponse !== "Pending") {
+        stopCountdown(activeIncident.parentResponse === "Timeout"
+          ? "Simulated 999 Escalation Triggered"
+          : `Simulated countdown stopped: ${activeIncident.parentResponse} response received.`);
+      }
+    }
+  } catch (error) {
+    incidentStatus.textContent = error.message;
+  }
+}
 
 thresholdInput.addEventListener("input", () => {
   thresholdValue.value = `${thresholdInput.value}%`;
+});
+
+refreshIncidentsButton.addEventListener("click", () => {
+  void loadIncidents();
 });
 
 async function runDetection() {
@@ -40,8 +129,12 @@ async function runDetection() {
         detectionLatched = true;
         status.textContent = "Matching class detected. Sending Telegram alert…";
         try {
-          await sendAlert(prediction.className, confidence);
+          const result = await sendAlert(prediction.className, confidence);
           status.textContent = "Alert sent. Check the configured Telegram chat.";
+          if (prediction.className.trim().toLowerCase() === "seizure") {
+            startEscalationCountdown(result.alertId);
+          }
+          void loadIncidents();
         } catch (error) {
           detectionLatched = false;
           status.textContent = error.message;
@@ -107,6 +200,7 @@ testButton.addEventListener("click", async () => {
   try {
     await sendAlert(classInput.value.trim() || "Test", 1, true);
     status.textContent = "Test alert sent. Check the configured Telegram chat.";
+    void loadIncidents();
   } catch (error) {
     status.textContent = error.message;
   } finally {
@@ -114,7 +208,13 @@ testButton.addEventListener("click", async () => {
   }
 });
 
+void loadIncidents();
+window.setInterval(() => {
+  void loadIncidents();
+}, 5000);
+
 window.addEventListener("pagehide", () => {
+  window.clearInterval(countdownInterval);
   if (stream) {
     stopCamera(video);
   }
