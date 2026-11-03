@@ -3,83 +3,127 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101827">
+    <meta name="theme-color" content="#0F172A">
     <title>EmeNoxr Emergency Notification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/styles/main.css">
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
     <script type="module" src="/scripts/app.js"></script>
+    <script type="module" src="/scripts/dashboard-ui.js"></script>
   </head>
   <body>
-    <main class="page">
-      <header class="page-header">
-        <p class="eyebrow">EmeNoxr</p>
-        <h1>Emergency notification</h1>
-        <p class="intro">Camera classification with Telegram notifications.</p>
-      </header>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span class="brand-name">EmeNoxr</span>
+        <span class="brand-descriptor">Emergency Monitoring System</span>
+      </div>
+      <div class="header-status" aria-label="System status">
+        <span id="header-camera-badge" class="badge">Camera: off</span>
+        <span id="header-system-badge" class="badge">System: idle</span>
+      </div>
+    </header>
 
-      <section class="notice" aria-label="Safety notice">
+    <main class="dashboard-layout">
+      <section class="notice notice-row" aria-label="Safety notice">
         <strong>Prototype only.</strong> This is not a medical device or a
         substitute for emergency services. The “Call 999” button and timed
         escalation are simulations; this app never places a call.
       </section>
 
-      <section class="panel" aria-labelledby="camera-heading">
-        <h2 id="camera-heading">Live detection</h2>
-        <p>Simulated detection sends a Seizure alert through Telegram without using the camera. No call is placed.</p>
-        <div class="camera-frame">
-          <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
-          <p id="camera-placeholder">Camera preview will appear here.</p>
-        </div>
+      <div class="column column-primary">
+        <section class="dashboard-card card-camera" aria-labelledby="camera-heading">
+          <div class="card-header">
+            <h2 id="camera-heading">Live camera</h2>
+            <span id="camera-state-badge" class="badge">Camera standby</span>
+          </div>
+          <div id="camera-container" class="camera-container" data-state="idle">
+            <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
+            <p id="camera-placeholder">Camera preview will appear here.</p>
+            <div class="overlay overlay-tl"><span class="live-indicator" aria-hidden="true"></span><span id="overlay-live">Standby</span></div>
+            <div class="overlay overlay-tr" id="overlay-connection">Disconnected</div>
+            <div class="overlay overlay-bl" id="overlay-detection">No detection</div>
+            <div class="overlay overlay-br" id="overlay-resolution"></div>
+          </div>
+        </section>
 
-        <div class="settings">
-          <label for="alert-class">Alert class name</label>
-          <input id="alert-class" name="alert-class" value="Seizure" maxlength="80">
+        <section class="dashboard-card card-status" aria-labelledby="status-heading">
+          <div class="card-header">
+            <h2 id="status-heading">Detection status</h2>
+            <span id="monitor-badge" class="badge">Idle</span>
+          </div>
+          <dl class="status-grid">
+            <div><dt>Current prediction</dt><dd id="stat-class">—</dd></div>
+            <div><dt>Confidence</dt><dd id="stat-confidence">—</dd></div>
+            <div><dt>Last alert state</dt><dd id="stat-last">—</dd></div>
+          </dl>
+        </section>
+      </div>
 
-          <label for="confidence-threshold">
-            Confidence threshold <output id="threshold-value" for="confidence-threshold">85%</output>
-          </label>
-          <input id="confidence-threshold" name="confidence-threshold" type="range"
-                 min="50" max="99" value="85">
-        </div>
+      <div class="column column-secondary">
+        <section class="dashboard-card card-controls" aria-labelledby="controls-heading">
+          <div class="card-header"><h2 id="controls-heading">Detection controls</h2></div>
+          <p class="card-text">Simulated detection sends a Seizure alert through Telegram without using the camera. No call is placed.</p>
 
-        <div class="actions">
-          <button id="start-button" type="button">Start detection</button>
-          <button id="stop-button" class="secondary" type="button" disabled>Stop</button>
-          <button id="simulate-detection-button" class="secondary" type="button" hidden>Simulate Seizure Detection</button>
-        </div>
-        <p id="model-error" class="status" role="alert" hidden></p>
-        <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
-        <p id="prediction" class="prediction">Waiting for a prediction.</p>
-        <p id="escalation-countdown" class="status countdown" role="timer" aria-live="off" hidden></p>
-      </section>
+          <div class="actions">
+            <button id="start-button" type="button">Start detection</button>
+            <button id="stop-button" class="secondary" type="button" disabled>Stop</button>
+            <button id="simulate-detection-button" class="secondary" type="button" hidden>Simulate Seizure Detection</button>
+          </div>
 
-      <section class="panel" aria-labelledby="test-heading">
-        <h2 id="test-heading">Telegram integration</h2>
-        <p>Send a clearly marked test message to the configured Telegram chat.</p>
-        <button id="test-alert-button" class="secondary" type="button">Send test Telegram alert</button>
-      </section>
+          <div class="settings">
+            <label for="alert-class">Alert class name</label>
+            <input id="alert-class" name="alert-class" value="Seizure" maxlength="80">
 
-      <section class="panel" aria-labelledby="incident-heading">
-        <div class="section-heading">
-          <h2 id="incident-heading">Incident history</h2>
-          <button id="refresh-incidents-button" class="secondary" type="button">Refresh</button>
-        </div>
-        <p id="incident-status" class="status" role="status" aria-live="polite">Loading incident history…</p>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Detection time</th>
-                <th scope="col">Alert time</th>
-                <th scope="col">Parent response</th>
-                <th scope="col">Outcome</th>
-              </tr>
-            </thead>
-            <tbody id="incident-list"></tbody>
-          </table>
-        </div>
-      </section>
+            <label for="confidence-threshold">
+              Confidence threshold <output id="threshold-value" for="confidence-threshold">85%</output>
+            </label>
+            <input id="confidence-threshold" name="confidence-threshold" type="range"
+                   min="50" max="99" value="85">
+          </div>
+
+          <p id="model-error" class="status" role="alert" hidden></p>
+          <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
+          <p id="prediction" class="prediction">Waiting for a prediction.</p>
+          <p id="escalation-countdown" class="status countdown" role="timer" aria-live="off" hidden></p>
+        </section>
+
+        <section class="dashboard-card card-telegram" aria-labelledby="test-heading">
+          <div class="card-header">
+            <div class="telegram-row">
+              <svg class="telegram-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 3.5 2.5 11l6 2.2L18 6.5l-7.5 8.3V20l3-3.5 4.5 3 2.5-16Z"/></svg>
+              <h2 id="test-heading">Telegram integration</h2>
+            </div>
+          </div>
+          <p class="card-text">Send a clearly marked test message to the configured Telegram chat.</p>
+          <button id="test-alert-button" type="button">Send test Telegram alert</button>
+        </section>
+
+        <section class="dashboard-card card-history history-card" aria-labelledby="incident-heading">
+          <div class="card-header">
+            <h2 id="incident-heading">Incident history</h2>
+            <button id="refresh-incidents-button" class="secondary" type="button">Refresh</button>
+          </div>
+          <p id="incident-status" class="status loading-row" role="status" aria-live="polite">Loading incident history…</p>
+          <div id="incident-state"></div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Detection time</th>
+                  <th scope="col">Alert time</th>
+                  <th scope="col">Parent response</th>
+                  <th scope="col">Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="incident-list"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
   </body>
 </html>
