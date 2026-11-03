@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101827">
+    <title>EmeNoxr Emergency Notification</title>
+    <link rel="stylesheet" href="/styles/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+    <script type="module" src="/scripts/app.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <p class="eyebrow">EmeNoxr</p>
+        <h1>Emergency notification</h1>
+        <p class="intro">Camera classification with Telegram notifications.</p>
+      </header>
+
+      <section class="notice" aria-label="Safety notice">
+        <strong>Prototype only.</strong> This is not a medical device or a
+        substitute for emergency services. “Call 999” and timed escalation are
+        simulations; this app never places a call.
+      </section>
+
+      <section class="panel" aria-labelledby="camera-heading">
+        <h2 id="camera-heading">Live detection</h2>
+        <div class="camera-frame">
+          <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
+          <p id="camera-placeholder">Camera preview will appear here.</p>
+        </div>
+
+        <div class="settings">
+          <label for="alert-class">Alert class name</label>
+          <input id="alert-class" name="alert-class" value="Seizure" maxlength="80">
+
+          <label for="confidence-threshold">
+            Confidence threshold <output id="threshold-value" for="confidence-threshold">85%</output>
+          </label>
+          <input id="confidence-threshold" name="confidence-threshold" type="range"
+                 min="50" max="99" value="85">
+        </div>
+
+        <div class="actions">
+          <button id="start-button" type="button">Start detection</button>
+          <button id="stop-button" class="secondary" type="button" disabled>Stop</button>
+        </div>
+        <p id="status" class="status" role="status" aria-live="polite">Ready to start.</p>
+        <p id="prediction" class="prediction">Waiting for a prediction.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="test-heading">
+        <h2 id="test-heading">Telegram integration</h2>
+        <p>Send a clearly marked test message to the configured Telegram chat.</p>
+        <button id="test-alert-button" class="secondary" type="button">Send test Telegram alert</button>
+      </section>
+    </main>
+  </body>
+</html>

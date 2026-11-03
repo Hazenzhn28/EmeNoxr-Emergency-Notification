@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+coverage/
+public/model/*
+!public/model/README.md

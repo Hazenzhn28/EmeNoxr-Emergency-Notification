@@ -1,0 +1,177 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #101827;
+  color: #eef3fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.page {
+  width: min(100% - 2rem, 760px);
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: #79d4c2;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0.4rem;
+  font-size: clamp(2rem, 6vw, 3rem);
+}
+
+h2 {
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.intro,
+.panel > p {
+  color: #b7c3d6;
+}
+
+.notice {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #8e6d35;
+  border-radius: 0.75rem;
+  background: #302719;
+  color: #ffe4a8;
+  line-height: 1.55;
+}
+
+.panel {
+  margin-top: 1rem;
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid #2b3a50;
+  border-radius: 1rem;
+  background: #172235;
+}
+
+.camera-frame {
+  position: relative;
+  display: grid;
+  min-height: 240px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: #080d16;
+}
+
+.camera-frame video {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+#camera-placeholder {
+  position: absolute;
+  margin: 0;
+  color: #94a3b8;
+}
+
+.settings {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.settings label {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.settings input:not([type="range"]) {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #41536d;
+  border-radius: 0.5rem;
+  background: #101827;
+  color: inherit;
+}
+
+.settings input[type="range"] {
+  width: 100%;
+  accent-color: #79d4c2;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+button {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: #79d4c2;
+  color: #10211f;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button.secondary {
+  border: 1px solid #52647e;
+  background: #24334a;
+  color: #eef3fb;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.status,
+.prediction {
+  margin: 1rem 0 0;
+  color: #c4d0e0;
+}
+
+.prediction {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 2rem 0;
+  }
+
+  .actions button {
+    flex: 1;
+  }
+}
