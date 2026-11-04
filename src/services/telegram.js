@@ -19,9 +19,12 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog, send
     record.cleanupTimeout.unref?.();
   }
 
-  async function sendAlert({ className, confidence, test }) {
+  async function sendAlert({ className, confidence, test, userId }) {
+    if (!userId) {
+      throw new TypeError("sendAlert requires the owning userId.");
+    }
     const alertId = randomUUID();
-    await incidentLog.recordDetection(alertId, new Date().toISOString());
+    await incidentLog.recordDetection(alertId, new Date().toISOString(), userId);
     const prefix = test ? "[TEST] " : "";
     const text = [
       `${prefix}EmeNoxr alert`,
@@ -52,7 +55,7 @@ function createTelegramService(bot, chatId, friendPhoneNumber, incidentLog, send
       alertTime: new Date().toISOString(),
       outcome: "Alert sent; awaiting parent response."
     });
-    const record = { status: "pending", messageId: message.message_id };
+    const record = { status: "pending", messageId: message.message_id, userId };
     alerts.set(alertId, record);
     record.escalationTimeout = setTimeout(() => {
       void escalate(alertId, record);

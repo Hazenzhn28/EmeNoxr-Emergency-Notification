@@ -1,17 +1,25 @@
 const path = require("node:path");
-const fs = require("node:fs");
 const express = require("express");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 const TelegramBot = require("node-telegram-bot-api");
-const { Pool } = require("pg");
 const {
   botToken,
   chatId,
   friendPhoneNumber,
-  databaseUrl,
-  databaseSslCaPath,
   demoSmsConfig,
-  port
+  port,
+  isProduction
 } = require("./config/env");
+const { pool } = require("./db/pool");
+const cryptoService = require("./services/crypto");
+const { createUserStore } = require("./services/users");
+const { createAuthService } = require("./services/auth");
+const { createCameraStore } = require("./services/cameras");
+const { createStreamManager } = require("./services/streamManager");
+const { createRequireAuth } = require("./middleware/requireAuth");
+const { createAuthRouter } = require("./routes/auth");
+const { createCameraRouter } = require("./routes/cameras");
 const { createAlertRouter } = require("./routes/alerts");
 const { createTelegramService } = require("./services/telegram");
 const { createTelegramCallbackHandler } = require("./handlers/telegramCallbacks");
@@ -19,38 +27,77 @@ const { createIncidentLog } = require("./services/incidents");
 const { createDemoSmsSender } = require("./services/demoSms");
 
 const app = express();
-const databaseConnectionUrl = new URL(process.env.DATABASE_URL);
-databaseConnectionUrl.searchParams.delete("sslmode");
-const databaseSsl = { rejectUnauthorized: true };
-if (databaseSslCaPath) {
-  databaseSsl.ca = fs.readFileSync(path.resolve(databaseSslCaPath), "utf8");
-}
-const pool = new Pool({
-  connectionString: databaseConnectionUrl.toString(),
-  ssl: databaseSsl
-});
+const users = createUserStore(pool);
+const authService = createAuthService({ users });
+const requireAuth = createRequireAuth(authService);
 const incidentLog = createIncidentLog(pool);
+const cameras = createCameraStore(pool, cryptoService);
+const streamManager = createStreamManager({ cameras });
 
-pool.on("error", error => {
-  console.error("Unexpected PostgreSQL pool error:", error.name || "UnknownError", error.code || "");
-});
+// Behind a reverse proxy (Render, Railway, Nginx) the rate limiter needs the real client IP.
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
 
 app.disable("x-powered-by");
+
+// Content-Security-Policy. If the browser console reports a blocked script or
+// connection (e.g. TensorFlow.js from a different CDN), add that origin here.
+const csp = {
+  ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+  "script-src": ["'self'", "https://cdn.jsdelivr.net"],
+  "img-src": ["'self'", "data:", "blob:"],
+  "media-src": ["'self'", "blob:"],
+  "connect-src": ["'self'"]
+};
+if (!isProduction) {
+  // Plain http://localhost must not be upgraded to https.
+  csp["upgrade-insecure-requests"] = null;
+}
+app.use(helmet({ contentSecurityPolicy: { directives: csp } }));
+
+app.use(cookieParser());
 app.use(express.json({ limit: "16kb" }));
 app.use("/api", (req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+
+// PUBLIC: register, login, logout. /me protects itself with requireAuth.
+app.use("/api/auth", createAuthRouter({ authService, users, requireAuth }));
+
+// Dashboard page guard: redirect to the login page instead of returning JSON.
+function requirePageLogin(req, res, next) {
+  const token = req.cookies?.[authService.cookieName];
+  if (token) {
+    try {
+      authService.verifyToken(token);
+      next();
+      return;
+    } catch {
+      // fall through to redirect
+    }
+  }
+  res.redirect("/login.html");
+}
+app.get(["/", "/index.html"], requirePageLogin);
 app.use(express.static(path.join(__dirname, "..", "public")));
-app.get("/api/incidents", async (req, res) => {
+
+// PROTECTED + TENANT-SCOPED: user id comes only from the verified token.
+app.get("/api/incidents", requireAuth, async (req, res) => {
   try {
-    const incidents = await incidentLog.list();
+    const incidents = await incidentLog.list(req.user.id);
     res.json({ incidents });
   } catch (error) {
     console.error("Incident list failed:", error.name || "UnknownError", error.code || "");
     res.status(500).json({ error: "Incident history could not be loaded." });
   }
 });
+
+// PROTECTED + TENANT-SCOPED: camera management and live streams.
+// Mounted here (before the /api 404 handler that startServer registers).
+app.use("/api/cameras", requireAuth, createCameraRouter({ cameras, streamManager }));
+
 async function startServer() {
   await incidentLog.initialize();
 
@@ -66,7 +113,10 @@ async function startServer() {
     incidentLog,
     sendDemoSms
   );
-  app.use("/api/alerts", createAlertRouter(telegram.sendAlert));
+
+  // PROTECTED: only logged-in users can trigger alerts.
+  app.use("/api/alerts", requireAuth, createAlertRouter(telegram.sendAlert));
+
   app.use("/api", (req, res) => {
     res.status(404).json({ error: "API route not found." });
   });
@@ -91,6 +141,8 @@ async function startServer() {
   async function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
+    // Open camera streams never finish on their own, so close them before server.close().
+    streamManager.stopAll();
     server.close(async error => {
       if (error) {
         console.error("HTTP server shutdown failed:", error.name || "UnknownError");

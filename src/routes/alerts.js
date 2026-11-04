@@ -39,7 +39,8 @@ function createAlertRouter(sendAlert) {
     }
 
     try {
-      const alertId = await sendAlert(validation.value);
+      // userId comes only from the verified JWT (set by requireAuth), never from the body.
+      const alertId = await sendAlert({ ...validation.value, userId: req.user.id });
       res.status(202).json({ ok: true, alertId });
     } catch (error) {
       console.error("Telegram alert delivery failed:", error.name || "UnknownError");

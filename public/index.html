@@ -24,10 +24,14 @@
       <div class="header-status" aria-label="System status">
         <span id="header-camera-badge" class="badge">Camera: off</span>
         <span id="header-system-badge" class="badge">System: idle</span>
+        <span id="user-name" class="badge" data-tone="teal" hidden></span>
+        <button id="logout-button" class="secondary logout-button" type="button">Logout</button>
       </div>
     </header>
 
-    <main class="dashboard-layout">
+    <p id="session-error" class="notice" role="alert" hidden></p>
+
+    <main class="dashboard-layout" hidden>
       <section class="notice notice-row" aria-label="Safety notice">
         <strong>Prototype only.</strong> This is not a medical device or a
         substitute for emergency services. The “Call 999” button and timed
@@ -38,10 +42,14 @@
         <section class="dashboard-card card-camera" aria-labelledby="camera-heading">
           <div class="card-header">
             <h2 id="camera-heading">Live camera</h2>
-            <span id="camera-state-badge" class="badge">Camera standby</span>
+            <div class="header-badges">
+              <span id="source-badge" class="badge">Source: Webcam</span>
+              <span id="camera-state-badge" class="badge">Camera standby</span>
+            </div>
           </div>
           <div id="camera-container" class="camera-container" data-state="idle">
-            <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
+            <video id="camera" autoplay muted playsinline aria-label="Webcam preview"></video>
+            <img id="rtsp-view" alt="Live RTSP camera feed" hidden>
             <p id="camera-placeholder">Camera preview will appear here.</p>
             <div class="overlay overlay-tl"><span class="live-indicator" aria-hidden="true"></span><span id="overlay-live">Standby</span></div>
             <div class="overlay overlay-tr" id="overlay-connection">Disconnected</div>
@@ -64,6 +72,49 @@
       </div>
 
       <div class="column column-secondary">
+        <section class="dashboard-card card-source" aria-labelledby="source-heading">
+          <div class="card-header"><h2 id="source-heading">Camera source</h2></div>
+
+          <div class="settings">
+            <label for="camera-select">Saved cameras</label>
+            <select id="camera-select" disabled>
+              <option value="">No cameras saved yet</option>
+            </select>
+          </div>
+
+          <div class="actions source-actions">
+            <button id="use-rtsp-button" type="button" disabled>Switch to RTSP Stream</button>
+            <button id="use-webcam-button" class="secondary" type="button" disabled>Switch to Webcam</button>
+          </div>
+          <p id="source-status" class="status" role="status" aria-live="polite"></p>
+
+          <details class="manage-cameras">
+            <summary>Manage cameras</summary>
+
+            <form id="add-camera-form" class="settings" novalidate>
+              <label for="camera-name">Camera name</label>
+              <input id="camera-name" name="camera-name" type="text" maxlength="80"
+                     autocomplete="off" placeholder="Living room" required>
+
+              <label for="camera-url">RTSP address</label>
+              <div class="input-with-action">
+                <input id="camera-url" name="camera-url" type="password" maxlength="2048"
+                       autocomplete="off" spellcheck="false" autocapitalize="off"
+                       aria-describedby="camera-url-hint" required>
+                <button id="toggle-url-button" class="secondary" type="button" aria-pressed="false">Show</button>
+              </div>
+              <p id="camera-url-hint" class="field-hint">
+                Example: rtsp://user:password@192.168.1.50:554/stream1. It is stored encrypted and never shown again.
+              </p>
+
+              <div id="camera-form-error" class="error" role="alert" aria-live="assertive"></div>
+              <button id="add-camera-button" type="submit">Add camera</button>
+            </form>
+
+            <ul id="camera-list" class="camera-list" aria-label="Your cameras"></ul>
+          </details>
+        </section>
+
         <section class="dashboard-card card-controls" aria-labelledby="controls-heading">
           <div class="card-header"><h2 id="controls-heading">Detection controls</h2></div>
           <p class="card-text">Simulated detection sends a Seizure alert through Telegram without using the camera. No call is placed.</p>
@@ -125,5 +176,8 @@
         </section>
       </div>
     </main>
+
+    <script type="module" src="/scripts/dashboard.js"></script>
+    <script type="module" src="/scripts/cameras.js"></script>
   </body>
 </html>

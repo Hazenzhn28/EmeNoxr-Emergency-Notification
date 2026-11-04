@@ -245,12 +245,66 @@ td { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* Mobile ordering: camera, controls, status, Telegram, history */
+/* ===== Camera source ===== */
+.camera-container img#rtsp-view { display: block; width: 100%; height: 100%; object-fit: contain; }
+.header-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.settings select {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--color-base-deep); color: var(--text-primary);
+  transition: border-color .2s ease;
+}
+.settings select:hover:not(:disabled) { border-color: var(--color-secondary); }
+.settings select:disabled { opacity: .55; }
+
+.source-actions { margin-top: 12px; }
+.source-actions button { flex: 1 1 160px; }
+
+.manage-cameras { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.manage-cameras summary { cursor: pointer; color: var(--color-teal-light); font-size: 13px; font-weight: 600; }
+.manage-cameras form { margin-top: 12px; }
+
+.input-with-action { display: flex; gap: 8px; }
+.input-with-action input { flex: 1; min-width: 0; }
+.input-with-action button { min-height: 42px; padding: 0 14px; }
+
+.field-hint { margin: 0; color: var(--text-muted); font-size: 12px; }
+.error {
+  margin: 4px 0 0; padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.5); border-radius: var(--radius-btn);
+  background: rgba(239, 68, 68, 0.12); color: #FECACA; font-size: 13px;
+}
+.error:empty { display: none; }
+
+button.small { min-height: 32px; padding: 4px 12px; font-size: 12px; }
+
+.camera-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.camera-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--color-surface-elevated);
+  border: 1px solid var(--border-subtle); border-radius: 10px;
+}
+.camera-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.camera-empty { color: var(--text-muted); font-size: 12px; }
+
+/* Mobile ordering: camera, source, controls, status, Telegram, history */
 @media (max-width: 767px) {
   .column { display: contents; }
   .card-camera { order: 1; }
-  .card-controls { order: 2; }
-  .card-status { order: 3; }
-  .card-telegram { order: 4; }
-  .card-history { order: 5; }
+  .card-source { order: 2; }
+  .card-controls { order: 3; }
+  .card-status { order: 4; }
+  .card-telegram { order: 5; }
+  .card-history { order: 6; }
 }
+
+/* The [hidden] attribute must beat rules like .badge { display: inline-flex } and
+   .dashboard-layout { display: grid }, which would otherwise keep hidden items visible. */
+[hidden] { display: none !important; }
+
+/* Header account controls */
+.header-status { align-items: center; }
+.logout-button { min-height: 30px; padding: 4px 14px; font-size: 12px; }
+.app-header ~ .notice { margin: 16px 32px 0; }
+
