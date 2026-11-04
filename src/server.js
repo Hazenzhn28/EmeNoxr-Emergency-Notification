@@ -9,7 +9,8 @@ const {
   friendPhoneNumber,
   demoSmsConfig,
   port,
-  isProduction
+  isProduction,
+  testMode
 } = require("./config/env");
 const { pool } = require("./db/pool");
 const cryptoService = require("./services/crypto");
@@ -17,6 +18,7 @@ const { createUserStore } = require("./services/users");
 const { createAuthService } = require("./services/auth");
 const { createCameraStore } = require("./services/cameras");
 const { createStreamManager } = require("./services/streamManager");
+const { createEscalationService } = require("./services/escalation");
 const { createRequireAuth } = require("./middleware/requireAuth");
 const { createAuthRouter } = require("./routes/auth");
 const { createCameraRouter } = require("./routes/cameras");
@@ -33,6 +35,7 @@ const requireAuth = createRequireAuth(authService);
 const incidentLog = createIncidentLog(pool);
 const cameras = createCameraStore(pool, cryptoService);
 const streamManager = createStreamManager({ cameras });
+const escalation = createEscalationService({ pool });
 
 // Behind a reverse proxy (Render, Railway, Nginx) the rate limiter needs the real client IP.
 if (isProduction) {
@@ -104,14 +107,18 @@ async function startServer() {
   const bot = new TelegramBot(botToken, { polling: true });
   const sendDemoSms = demoSmsConfig ? createDemoSmsSender(demoSmsConfig) : null;
   if (!sendDemoSms) {
-    console.warn("Demo SMS is not configured; the 60-second action will remain simulation-only.");
+    console.warn("Demo SMS is not configured; the dummy 999 and demo SMS steps will not send email.");
   }
+  console.log(`Dummy 999 mode: ${testMode ? "TEST_MODE (test inbox only)" : "mock NG999 (nothing is sent)"}`);
+
+  // Creating the Telegram service registers the escalation handlers, so it must come before start().
   const telegram = createTelegramService(
     bot,
     chatId,
     friendPhoneNumber,
     incidentLog,
-    sendDemoSms
+    escalation,
+    { sendDemoSms, testMode }
   );
 
   // PROTECTED: only logged-in users can trigger alerts.
@@ -137,6 +144,10 @@ async function startServer() {
     console.log(`EmeNoxr server listening on http://localhost:${port}`);
   });
 
+  // Starts the 5-second poller. It also runs once immediately, which picks up any escalation
+  // that came due while the server was down.
+  escalation.start();
+
   let shuttingDown = false;
   async function shutdown() {
     if (shuttingDown) return;
@@ -146,6 +157,12 @@ async function startServer() {
     server.close(async error => {
       if (error) {
         console.error("HTTP server shutdown failed:", error.name || "UnknownError");
+      }
+      // Order matters: escalation handlers use the bot and the pool, so stop them first.
+      try {
+        await escalation.stop();
+      } catch (stopError) {
+        console.error("Escalation shutdown failed:", stopError.name || "UnknownError");
       }
       try {
         await bot.stopPolling();
@@ -170,6 +187,11 @@ startServer().catch(async error => {
     error.name || "UnknownError",
     error.code || ""
   );
+  try {
+    await escalation.stop();
+  } catch {
+    // nothing to clean up if it never started
+  }
   try {
     await pool.end();
   } catch (closeError) {

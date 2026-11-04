@@ -1,5 +1,9 @@
 const express = require("express");
 
+function isMissing(value) {
+  return value === undefined || value === null;
+}
+
 function validateAlert(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { error: "Request body must be a JSON object." };
@@ -19,11 +23,39 @@ function validateAlert(body) {
     return { error: "test must be a boolean when provided." };
   }
 
+  // Location is optional (the user may deny permission), but it is all or nothing.
+  // null is accepted as "not available" so the frontend can send it as-is.
+  let locationLat = null;
+  let locationLng = null;
+  const hasLat = !isMissing(body.locationLat);
+  const hasLng = !isMissing(body.locationLng);
+  if (hasLat !== hasLng) {
+    return { error: "locationLat and locationLng must be provided together." };
+  }
+  if (hasLat && hasLng) {
+    if (typeof body.locationLat !== "number"
+      || !Number.isFinite(body.locationLat)
+      || body.locationLat < -90
+      || body.locationLat > 90) {
+      return { error: "locationLat must be a number between -90 and 90." };
+    }
+    if (typeof body.locationLng !== "number"
+      || !Number.isFinite(body.locationLng)
+      || body.locationLng < -180
+      || body.locationLng > 180) {
+      return { error: "locationLng must be a number between -180 and 180." };
+    }
+    locationLat = body.locationLat;
+    locationLng = body.locationLng;
+  }
+
   return {
     value: {
       className,
       confidence: body.confidence,
-      test: body.test === true
+      test: body.test === true,
+      locationLat,
+      locationLng
     }
   };
 }

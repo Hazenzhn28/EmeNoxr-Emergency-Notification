@@ -103,7 +103,38 @@ function createIncidentLog(pool) {
     return result.rows;
   }
 
-  return { initialize, recordDetection, update, list };
-}
+    // Atomic compare-and-set: applies the updates only if parent_response is currently one of
+  // fromStates. Returns the updated row, or null if the state had already moved on.
+  async function transition(alertId, fromStates, updates) {
+    const allowedColumns = {
+      alertTime: "alert_time",
+      parentResponse: "parent_response",
+      outcome: "outcome",
+      escalationLevel: "escalation_level"
+    };
+    const assignments = [];
+    const values = [alertId, fromStates];
 
+    for (const [key, column] of Object.entries(allowedColumns)) {
+      if (Object.hasOwn(updates, key)) {
+        values.push(updates[key]);
+        assignments.push(`${column} = $${values.length}`);
+      }
+    }
+    if (assignments.length === 0) {
+      throw new TypeError("Incident transition must include a supported field.");
+    }
+
+    const result = await pool.query(
+      `UPDATE public.incidents
+       SET ${assignments.join(", ")}
+       WHERE alert_id = $1 AND parent_response = ANY($2::text[])
+       RETURNING ${INCIDENT_COLUMNS}`,
+      values
+    );
+    return result.rows[0] || null;
+  }
+
+    return { initialize, recordDetection, update, transition, list };
+}
 module.exports = { createIncidentLog };

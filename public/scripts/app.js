@@ -2,6 +2,7 @@ import { startCamera, stopCamera } from "./camera.js";
 import { classify, loadModel } from "./classifier.js";
 import { sendAlert } from "./alerts.js";
 import { loadIncidents, setIncidentsListener } from "./incidents.js";
+import { getAlertLocation, primeLocation, stopLocationRefresh, describeLocationProblem } from "./location.js";
 
 const video = document.querySelector("#camera");
 const placeholder = document.querySelector("#camera-placeholder");
@@ -69,11 +70,16 @@ document.querySelector("#refresh-incidents-button").addEventListener("click", ()
 });
 
 // Single alert path used by BOTH real camera detection and the simulate button.
+// Single alert path used by BOTH real camera detection and the simulate button.
 async function triggerAlert(className, confidence, test = false) {
-  const result = await sendAlert(className, confidence, test);
-  status.textContent = test
+  const location = await getAlertLocation(); // never throws; null coordinates if unavailable
+  const result = await sendAlert(className, confidence, test, location);
+  const locationNote = location.locationLat === null
+    ? ` Location not included (${describeLocationProblem(location.reason)}).`
+    : "";
+  status.textContent = (test
     ? "Test alert sent. Check the configured Telegram chat."
-    : "Alert sent. Check the configured Telegram chat.";
+    : "Alert sent. Check the configured Telegram chat.") + locationNote;
   if (!test && className.trim().toLowerCase() === "seizure") {
     startEscalationCountdown(result.alertId);
   }
@@ -122,6 +128,7 @@ async function runDetection() {
 
 async function stopDetection() {
   running = false;
+  stopLocationRefresh();
   startButton.disabled = false;
   stopButton.disabled = true;
   if (stream) {
@@ -146,6 +153,13 @@ startButton.addEventListener("click", async () => {
     stopButton.disabled = false;
     status.textContent = "Detection is running.";
     void runDetection();
+    // Ask for location permission now, while the user is at the screen, not mid-emergency.
+    void primeLocation().then(result => {
+      if (!result.ok && running && status.textContent === "Detection is running.") {
+        status.textContent =
+          `Detection is running. Alerts will not include a location (${describeLocationProblem(result.reason)}).`;
+      }
+    });
   } catch (error) {
     if (stream) {
       stopCamera(video);
