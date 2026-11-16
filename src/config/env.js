@@ -136,7 +136,7 @@ module.exports = {
   chatId: env.TELEGRAM_CHAT_ID,
   friendPhoneNumber: env.TELEGRAM_FRIEND_PHONE_NUMBER,
   databaseUrl: env.DATABASE_URL,
-  databaseSslCaPath: env.DATABASE_SSL_CA,
+  databaseSslCa: env.DATABASE_SSL_CA,
   demoSmsConfig,
   port: env.PORT,
 

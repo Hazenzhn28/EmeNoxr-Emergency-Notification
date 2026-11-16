@@ -57,7 +57,24 @@ if (!isProduction) {
   // Plain http://localhost must not be upgraded to https.
   csp["upgrade-insecure-requests"] = null;
 }
-app.use(helmet({ contentSecurityPolicy: { directives: csp } }));
+// src/server.js
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        // The default directives are kept for everything else
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        // Allow TensorFlow.js and Teachable Machine scripts from the CDN
+        "script-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-eval'"],
+        // Allow the browser to fetch the model from the same CDN
+        "connect-src": ["'self'", "https://cdn.jsdelivr.net"],
+        // Ensure images from your camera stream (MJPEG) are allowed
+        "img-src": ["'self'", "data:", "blob:"],
+      },
+    },
+  })
+);
 
 app.use(cookieParser());
 app.use(express.json({ limit: "16kb" }));

@@ -102,6 +102,20 @@ EmeNoxr is a full-stack capstone prototype for exploring how computer-vision mon
 
 6. (Optional) Enable demo email/email-to-SMS by filling in **all** SMTP values and `DEMO_SMS_TO`. For example, with Gmail use an App Password rather than your regular account password. `TEST_MODE=true` is the safe default: the optional message is a test message, not an emergency notification. If SMTP is omitted, the escalation is still recorded, but no email or SMS is sent. Setting `TEST_MODE=false` does not enable a real emergency integration; the current NG999 integration remains a mock and sends nothing.
 
+## Deployment on Render
+
+Create a **Web Service** for this repository on Render, use `npm install` as the build command and `npm start` as the start command, then add the app's configuration under **Environment**. Set the required variables from `.env.example`, including:
+
+- `NODE_ENV=production` so production behavior is enabled, especially secure session cookies when Render serves the app over HTTPS.
+- `DATABASE_URL` to the PostgreSQL connection URI for your hosted database.
+- `JWT_SECRET` and `ENCRYPTION_KEY` to separate, securely generated secrets. Keep `JWT_SECRET` at least 32 characters and `ENCRYPTION_KEY` exactly 64 hexadecimal characters.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `TELEGRAM_FRIEND_PHONE_NUMBER`.
+- `TEST_MODE=true` unless you specifically intend to disable the demo-only behavior.
+
+Do not set a fixed `PORT` in Render; leave that variable blank/unset so Render can provide the port at runtime. The app reads Render's injected `PORT` automatically.
+
+If your database requires a custom CA certificate, set `DATABASE_SSL_CA` to the **raw certificate text**, including the `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----` lines. Do not set it to a certificate file path on Render. For local development, it can still be set to a path to a PEM file. Leave it blank if your database does not require a custom CA. Optional SMTP variables should only be set when configuring the demo email feature, following the all-or-nothing setup described above.
+
 ## How to Run the App
 
 Start the server:
